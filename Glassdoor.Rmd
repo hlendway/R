@@ -70,17 +70,20 @@ location <- "Chicago"
 location <- "St. Paul"
 location <- gsub(" ","+",location)
 location_json <- paste0("https://www.glassdoor.com/findPopularLocationAjax.htm?term=",location,"&maxLocationsToReturn=10")
+#Read the JSON for the location link created above
 document <- jsonlite::fromJSON(location_json)
-df <- data.frame(lapply(document$advisorModels, as.character), stringsAsFactors=FALSE)
+#df <- data.frame(lapply(document$advisorModels, as.character), stringsAsFactors=FALSE)
 
 ##Select the first result, as it's most likely the correct match.  If you're not sure you could loop through and pull results for all possible cities.
+#Build the link to the result page for the location selected
 location_companies_url <- paste0("https://www.glassdoor.com/Reviews/company-reviews.htm?suggestCount=0&suggestChosen=false&clickSource=searchBtn&typedKeyword=&sc.keyword=&locT=",document$locationType[1],"&locId=",document$locationId[1],"&jobType=")
 ```
 
 ###Reading html
 
 ```{r}
-#Read the company result page
+#Read the first result page of companies for that city
+#i.e. html that corresponds to https://www.glassdoor.com/Reviews/minneapolis-reviews-SRCH_IL.0,11_IM567.htm
 location_results <- read_html(location_companies_url)
 
 #get links to company result pages 2-10
@@ -133,6 +136,7 @@ for(h in 0:length(result_pages$link)) {
     location_results <- read_html(result_pages$link[h])
   }
   
+  #Get the link to each company review page
   company_urls <- location_results %>% 
     html_nodes(".empLinks") %>% 
     html_node(".reviews") %>% 
@@ -145,6 +149,7 @@ for(h in 0:length(result_pages$link)) {
   #for testing using i = 1 and skip for loop
   #i<- 1
   
+  #Reading the first ten reviews for each company
   for(i in 1:length(review_urls_df$full_url)) {
     
     review_page <- read_html(review_urls_df$full_url[i])

@@ -123,15 +123,18 @@ location &lt;-<span class="st"> &quot;Chicago&quot;</span>
 location &lt;-<span class="st"> &quot;St. Paul&quot;</span>
 location &lt;-<span class="st"> </span><span class="kw">gsub</span>(<span class="st">&quot; &quot;</span>,<span class="st">&quot;+&quot;</span>,location)
 location_json &lt;-<span class="st"> </span><span class="kw">paste0</span>(<span class="st">&quot;https://www.glassdoor.com/findPopularLocationAjax.htm?term=&quot;</span>,location,<span class="st">&quot;&amp;maxLocationsToReturn=10&quot;</span>)
+<span class="co">#Read the JSON for the location link created above</span>
 document &lt;-<span class="st"> </span>jsonlite<span class="op">::</span><span class="kw">fromJSON</span>(location_json)
-df &lt;-<span class="st"> </span><span class="kw">data.frame</span>(<span class="kw">lapply</span>(document<span class="op">$</span>advisorModels, as.character), <span class="dt">stringsAsFactors=</span><span class="ot">FALSE</span>)
+<span class="co">#df &lt;- data.frame(lapply(document$advisorModels, as.character), stringsAsFactors=FALSE)</span>
 
 ##Select the first result, as it's most likely the correct match.  If you're not sure you could loop through and pull results for all possible cities.
+<span class="co">#Build the link to the result page for the location selected</span>
 location_companies_url &lt;-<span class="st"> </span><span class="kw">paste0</span>(<span class="st">&quot;https://www.glassdoor.com/Reviews/company-reviews.htm?suggestCount=0&amp;suggestChosen=false&amp;clickSource=searchBtn&amp;typedKeyword=&amp;sc.keyword=&amp;locT=&quot;</span>,document<span class="op">$</span>locationType[<span class="dv">1</span>],<span class="st">&quot;&amp;locId=&quot;</span>,document<span class="op">$</span>locationId[<span class="dv">1</span>],<span class="st">&quot;&amp;jobType=&quot;</span>)</code></pre></div>
 </div>
 <div id="reading-html" class="section level3">
 <h3>Reading html</h3>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co">#Read the company result page</span>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co">#Read the first result page of companies for that city</span>
+<span class="co">#i.e. html that corresponds to https://www.glassdoor.com/Reviews/minneapolis-reviews-SRCH_IL.0,11_IM567.htm</span>
 location_results &lt;-<span class="st"> </span><span class="kw">read_html</span>(location_companies_url)
 
 <span class="co">#get links to company result pages 2-10</span>
@@ -187,6 +190,7 @@ company_reviews &lt;-<span class="st"> </span><span class="kw">tibble</span>()
     location_results &lt;-<span class="st"> </span><span class="kw">read_html</span>(result_pages<span class="op">$</span>link[h])
   }
   
+  <span class="co">#Get the link to each company review page</span>
   company_urls &lt;-<span class="st"> </span>location_results <span class="op">%&gt;%</span><span class="st"> </span>
 <span class="st">    </span><span class="kw">html_nodes</span>(<span class="st">&quot;.empLinks&quot;</span>) <span class="op">%&gt;%</span><span class="st"> </span>
 <span class="st">    </span><span class="kw">html_node</span>(<span class="st">&quot;.reviews&quot;</span>) <span class="op">%&gt;%</span><span class="st"> </span>
@@ -199,6 +203,7 @@ company_reviews &lt;-<span class="st"> </span><span class="kw">tibble</span>()
   <span class="co">#for testing using i = 1 and skip for loop</span>
   <span class="co">#i&lt;- 1</span>
   
+  <span class="co">#Reading the first ten reviews for each company</span>
   <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="op">:</span><span class="kw">length</span>(review_urls_df<span class="op">$</span>full_url)) {
     
     review_page &lt;-<span class="st"> </span><span class="kw">read_html</span>(review_urls_df<span class="op">$</span>full_url[i])
