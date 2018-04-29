@@ -1,5 +1,5 @@
 ---
-title: "Webscraping - Glassdoor"
+title: "Web scraping - Glassdoor"
 author: "Heather Lendway"
 output:
   prettydoc::html_pretty:
@@ -133,7 +133,8 @@ for(h in 0:length(result_pages$link)) {
   #We already read the first page, once we get past that read subsequent pages.
   #Could clean this up.
   if(h != 0) {
-    location_results <- read_html(result_pages$link[h])
+    location_results <- read_html(result_pages$link[h]
+                                  )
   }
   
   #Get the link to each company review page
