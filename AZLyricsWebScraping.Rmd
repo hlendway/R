@@ -1,0 +1,217 @@
+---
+title: "AZ Lyric Web Scraping"
+author: "Heather Lendway"
+output:
+  prettydoc::html_pretty:
+    highlight: vignette
+    theme: cayman
+  bookdown::tufte_html2:
+    number_sections: no
+    split_by: none
+    toc: no
+  bookdown::html_document2:
+    number_sections: no
+    split_by: none
+    toc: yes
+    toc_float:
+      collapsed: yes
+  rmarkdown::html_document:
+    highlight: espresso
+    theme: lumen
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(xml2)
+library(rvest)
+library(stringr)
+library(tidytext)
+library(slam)
+library(wordcloud)
+
+install.packages('devtools')
+library(devtools)
+library("tm")
+library("SnowballC")
+library("wordcloud")
+library("RColorBrewer")
+```
+
+
+###Scrape AZ Lyrics 
+
+```{r}
+
+#Set up artist/group name - different test cases below
+artist <- "above & beyond"
+#artist <- "Ke$ha"
+#artist <- "Taylor Swift"
+#artist <- "Coldplay"
+artist_search_str <- gsub(" ","+",artist)
+
+#If there are multiple aritsts with the same name allow user to set which result they want
+#Default to the first result
+result_num <- 1
+
+#URLencode from base doesn't seem to do this and I couldn't figure out how stringi or stringr do this conversion
+#What other special characters to artists have in their names?
+artist_search_str <- gsub("&","%26",artist_search_str)
+artist_search_str <- gsub("\\$","%24",artist_search_str)
+
+#Use artist name as search query parameter q
+artist_search_url <- paste0("https://search.azlyrics.com/search.php?q=",artist_search_str)
+
+#Read the result page
+artist_results <- read_html(artist_search_url)
+
+#get the first result, assumes there's one artist with this name
+#TODO build this out to allow user to pass in value if they know multiple artists with this name.  Default to first result but allow to specific others
+artist_links <- artist_results %>% 
+  html_node("table") %>% 
+  html_nodes("a") %>% 
+  html_attr("href") %>% 
+  toString()
+
+artist_links_tibble <- tibble(artist_links)
+
+#Read the html page for the artist, using the reult_num specified
+artist_page <- read_html(artist_links_tibble$artist_links[result_num])
+
+#Because the songs are not in the album nodes we'll have to go through the list of divs and a tags in order to associate a song to an album, get div and a tags
+# the # let's you select by tag id
+album_nodes <- artist_page %>% 
+  html_node("div#listAlbum") %>% 
+  html_nodes("div,a")
+
+#Loop through all the nodes div and a nodes on the page
+#for testing
+#i <- 12
+album <- ""
+results <- tibble()
+for(i in 1:length(album_nodes)) {
+
+  current_node <- album_nodes[i]
+      
+  #if it's a div set it to be album name and year
+  if(current_node %>% html_name() == "div") {
+    album <- current_node %>% html_text() %>% toString()
+    print(paste0(album))
+  }
+  
+  #if a tag is empty it's just an anchor, skip loop
+  if(current_node %>% html_name() == "a" & !is.na(current_node %>% html_attr("href"))) {
+    
+    #if it's an a tag with href grab song name and url
+    if(current_node %>% html_name() == "a") {
+      song <- current_node %>% html_text() %>% toString()
+      song_url <- current_node %>% html_attr("href") %>% toString()
+      song_url <- str_replace(song_url,"..","https://www.azlyrics.com")
+      
+      #Read lyrics and tack them on to tibble
+      lyrics_page <- read_html(song_url)
+      
+      lyric_rows <- lyrics_page %>% 
+        html_nodes(".row") 
+      
+      lyrics <- ""
+      if(length(lyric_rows) > 1) {
+        lyric_divs <- lyric_rows[2] %>% 
+          html_nodes("div") 
+        
+        if(length(lyric_divs) > 9) {
+          lyrics <- lyric_divs[10] %>% 
+            toString()
+        }
+      }
+      row <- tibble(artist,album,song,song_url,lyrics)
+      results <- results %>% bind_rows(row)
+      print(paste0(album,",",song))
+      Sys.sleep(10)
+    }
+  }
+
+}
+```
+```{r}
+#clean the results
+lyrics_clean <- results %>% 
+  group_by(album) %>% 
+  add_tally() %>% 
+  ungroup() %>% 
+  rename(song_count = n) %>% 
+  mutate(year = gsub('.*\\(|\\).*',"",album),
+         album = gsub('.*:|\\(.*',"",album),
+         album = gsub('\"',"",album),
+         album = trimws(album,c("both")),
+         lyrics = gsub('<div>|\"|\\r|\\n|<!--.* -->|</div>',"",lyrics),
+         lyrics = gsub('<br><br>',"<br>",lyrics),
+         album = ifelse((album == ""),"Other Release",album),
+         year = ifelse((year == "other songs:"),"",year),
+         album_title = ifelse((year == ""),
+                              paste0(album," - ",song_count, " songs"),
+                              paste0(year," - ",album," - ",song_count, " songs"))) %>% 
+  mutate(lyrics_rows = strsplit(lyrics, "<br>")) %>% 
+  unnest(lyrics_rows) %>% 
+  group_by(album,song) %>% 
+  mutate(lyrics_line = row_number()) 
+
+data("stop_words")
+
+tidy_lyrics <- lyrics_clean %>% 
+  unnest_tokens("word",lyrics_rows) %>% 
+  anti_join(stop_words)
+
+tidy_lyrics %>% 
+  ungroup() %>% 
+  count(word, sort = TRUE) %>% 
+  filter(n > 15) %>% 
+  mutate(word = reorder(word,n)) %>% 
+  ggplot(aes(word, n)) +
+  geom_col() +
+  labs(x = NULL,y = "Count", title = "Above & Beyond Most Common Lyrics") +
+  coord_flip()
+
+```
+
+```{r, fig.height = 8, fig.width = 12}
+tidy_lyrics %>% 
+  group_by(album,album_title) %>% 
+  count(word, sort = TRUE) %>% 
+  filter(n > 9) %>% 
+  arrange(album,n) %>% 
+  ggplot(aes(reorder(word,n), n, fill = album_title)) +
+  geom_col() +
+  scale_fill_manual(values = c( "#9E0142","#D53E4F","#F46D43","#2e8b57","#3288BD","#5E4FA2")) +
+  facet_wrap(~ album_title, scales = "free",ncol = 2) +
+  labs(x = NULL,y = "Count", title = "Above & Beyond Most Common Lyrics", fill = "Album") +
+  coord_flip() + 
+  theme(axis.text.y = element_text(size = 20),
+        axis.text.x = element_text(size = 20), 
+        title = element_text(face="bold", size = 24),
+        strip.text = element_text(face="bold", size=16))
+
+```
+
+```{r}
+
+pal <- brewer.pal(10, "Spectral")
+
+tidy_lyrics %>% 
+  ungroup() %>% 
+  count(word) %>% 
+  with(wordcloud(word, n, max.words = 50, random.order = TRUE, random.color = TRUE, colors = pal))
+
+```
+
+```{r}
+
+pal <- brewer.pal(10, "Spectral")
+
+tidy_lyrics %>% 
+  ungroup() %>% 
+  filter(album == "Common Ground") %>% 
+  count(word) %>% 
+  with(wordcloud(word, n, max.words = 50, random.order = TRUE, random.color = TRUE, colors = pal))
+
+```
