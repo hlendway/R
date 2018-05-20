@@ -29,6 +29,8 @@ library(stringr)
 library(tidytext)
 library(slam)
 library(wordcloud)
+library(grid)
+library(gridExtra)
 
 install.packages('devtools')
 library(devtools)
@@ -154,13 +156,14 @@ lyrics_clean <- results %>%
   mutate(lyrics_rows = strsplit(lyrics, "<br>")) %>% 
   unnest(lyrics_rows) %>% 
   group_by(album,song) %>% 
-  mutate(lyrics_line = row_number()) 
+  mutate(lyrics_line = row_number())
 
 data("stop_words")
 
 tidy_lyrics <- lyrics_clean %>% 
   unnest_tokens("word",lyrics_rows) %>% 
-  anti_join(stop_words)
+  anti_join(stop_words) %>% 
+  filter(word != "2x") # need to figure out how to fix this so it duplicates rows where 2x is specified
 
 tidy_lyrics %>% 
   ungroup() %>% 
@@ -208,10 +211,86 @@ tidy_lyrics %>%
 
 pal <- brewer.pal(10, "Spectral")
 
+layout(matrix(c(1, 2), nrow=2), heights=c(1, 4))
+par(mar=rep(0, 4))
+plot.new()
+text(x=0.5, y=0.5, "Common Ground",font = 4)
 tidy_lyrics %>% 
   ungroup() %>% 
   filter(album == "Common Ground") %>% 
   count(word) %>% 
-  with(wordcloud(word, n, max.words = 50, random.order = TRUE, random.color = TRUE, colors = pal))
+  with(wordcloud(word, n, min.freq = 5, max.words = 50, random.order = FALSE, random.color = TRUE, colors = pal))
 
 ```
+
+```{r}
+
+
+# Expects a tidy text tibble with a column named word with one word in each row.
+# Group by another variable in the tibble and filter to a specific value for that group
+# i.e. group by album and filter to a specific album
+album_word_cloud <- function(tidy_lyrics,group_var,group_val,title){
+  
+  group_var <- enquo(group_var)
+  
+  pal <- brewer.pal(10, "Spectral")
+
+  layout(matrix(c(1, 2), nrow=2), heights=c(1, 12))
+  par(mar=rep(0, 4))
+  plot.new()
+  text(x=0.5, y=0.5, title, font = 4)
+  
+  tidy_lyrics %>% 
+    ungroup() %>% 
+    filter(!!group_var == group_val) %>% 
+    count(word) %>% 
+    with(wordcloud(word, n, max.words = 50, random.order = FALSE, random.color = TRUE, rot.per = .25, colors = pal))
+  
+}
+
+```
+
+
+```{r}
+album_word_cloud(tidy_lyrics, album, "Common Ground", "2016 - Common Ground")
+```
+
+```{r}
+album_names <- unique(tidy_lyrics$album)
+album_titles <- unique(tidy_lyrics$album_title)
+
+for (var in 1:(length(album_names)-1)) album_word_cloud(tidy_lyrics, album, album_names[var],album_titles[var])
+
+```
+
+
+```{r}
+
+#skip songs not associated to an album
+saveGIF({
+  for (var in 1:(length(album_names)-1)) album_word_cloud(tidy_lyrics, album, album_names[var], album_titles[var])
+}, movie.name = "ab_album_clouds.gif")
+
+saveGIF({
+  for (i in 1:10) plot(runif(10), ylim = 0:1)
+})
+
+saveHTML({
+  for (i in 1:10) plot(runif(10), ylim = 0:1)
+})
+
+ani.options("convert")
+## like 'C:/Software/LyX/etc/ImageMagick/convert.exe'
+
+saveGIF({
+  brownian.motion(pch = 21, cex = 5, col = "red", bg = "yellow")
+},convert = "convert", movie.name = "brownian_motion.gif", interval = 0.1, nmax = 30, 
+  ani.width = 600)
+
+## non-constant intervals between image frames
+saveGIF({
+  brownian.motion(pch = 21, cex = 5, col = "red", bg = "yellow")
+}, movie.name = "brownian_motion2.gif", interval = runif(30, 
+  0.01, 1), nmax = 30)
+```
+
