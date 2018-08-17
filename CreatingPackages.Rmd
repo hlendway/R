@@ -36,7 +36,7 @@ knitr::opts_chunk$set(echo = TRUE)
     + Read the "Naming your package" section - [http://r-pkgs.had.co.nz/package.html](http://r-pkgs.had.co.nz/package.html)
     + Name can consist of letters, numbers and period (recommend against using periods though)
     + Pick a unique name you could easily google and validate the name is not already in use
-        + Fill in "PACKAGE_NAME" - [http://cran.r-project.org/web/packages/[PACKAGE_NAME](http://cran.r-project.org/web/packages/[PACKAGE_NAME])
+        + Fill in "PACKAGE_NAME" - [http://cran.r-project.org/web/packages/PACKAGE_NAME](http://cran.r-project.org/web/packages/[PACKAGE_NAME])
     + Avoid using upper and lower, harder to remember hEaThErSpAcKaGe vs. heatherspackage
     + Find a word that describes the problem you're solving and use abbreviations, i.e. mltools
     + Add an extra R, i.e. stringr, sparklyr, dplyr, tidyr
