@@ -1,0 +1,314 @@
+---
+title: 'Top Ten R Tips & Tricks'
+author: 'Heather Lendway'
+output:
+  prettydoc::html_pretty:
+    highlight: vignette
+    theme: cayman
+    number_sections: no
+  bookdown::tufte_html2:
+    number_sections: no
+    split_by: none
+    toc: no
+  bookdown::html_document2:
+    number_sections: no
+    split_by: none
+    toc: yes
+    toc_float:
+      collapsed: yes
+  rmarkdown::html_document:
+    highlight: espresso
+    theme: lumen
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(babynames)
+library(janitor)
+library(nycflights13)
+data(iris)
+
+test_data <- read.csv("C:/Users/A8TZ3ZZ/Documents/Code/Adhoc/sampleData.csv") %>% 
+  select(-X) %>% 
+  filter(created_year == 2017)
+
+test_data2 <- read.csv("C:/Users/A8TZ3ZZ/Documents/Code/Adhoc/sampleData.csv") %>% 
+  select(-X)
+
+iris <- iris %>% 
+  mutate("new col" = Sepal.Length*2,
+         test1 = NA,
+         test2 = NA,
+         test3 = ifelse((Sepal.Length > 5),NA,Sepal.Length),
+         percent = Sepal.Length/Sepal.Width)
+
+```
+
+
+###*1. The Pipe "%>%"*
+Hopefully as R users you are familiar with the pipe - "%>%". You can use the pipe to pass your results into the next command without having to save your data to many intermediary variables.  The short cut for typing the pipe "%>%" quickly is <b>ctrl + shift + m</b>. If you're not already using this shortcut it will definitely speed up your coding process!
+
+```{r, eval=FALSE,warning=FALSE}
+# This code...
+no_sepal_length <- select(iris, -Sepal.Length)
+iris_with_ratio <- mutate(no_sepal_length, petal.ratio = Petal.Length/Petal.Width)
+filtered_iris <- filter(iris_with_ratio, Species == "setosa")
+
+# ...turns into this code
+new_iris <- iris %>% 
+  select(-Sepal.Length) %>% 
+  mutate(petal.ratio = Petal.Length/Petal.Width) %>% 
+  filter(Species == "setosa")
+```
+
+###*2. The backtick \`*
+The difference between the backtick \` and apostrophe ' is very subtle visually but the difference is significant in R.  To reference a column name with spaces or a reserved word,  in many cases you must use backticks.  For the sample below I added a column called "new col".  If I try to filter on the values of "new col" the filter doesn't work, but when I use \`new col\` it works.  If you end up with a reserved word like NA, NULL or if as a column name, you would also need to reference them with the backtick \`. 
+
+With the quotes are "new col", it's recognized as a string instead of the column name. 
+```{r, eval=TRUE,warning=FALSE}
+
+iris %>% 
+  filter('new col' > 10) %>% 
+  slice(1:10)
+
+```
+
+```{r, eval=r, eval=TRUE,warning=FALSE}
+
+iris %>% 
+  filter(`new col` > 10) %>% 
+  slice(1:10)
+
+```
+
+As a side note, if you do have a file with long column titles with spaces, I recommend using the janitor package to quick clean up your column names for coding sake.
+```{r, eval=r, eval=TRUE,warning=FALSE}
+
+iris %>% 
+  clean_names() %>% 
+  slice(1:10)
+
+```
+
+###*3. Remove or Select NA/NULL Columns*
+When working with large data sets you may find that entire columns of data are NULL or NA.  You may want to quickly clean up your data so you're only dealing with values you care about or maybe you want to quick validate you're actually getting the data you expect in a column.  You can quickly get rid of all the NULL/NA columns or select them all to ensure you're not missing something. To do this in R we will use the select_if command with is.na() and is.null() which evalute to TRUE/1 and FALSE/0. Summing not na or null for the column will be zero if every row is na or null and greater than zero if there is a value in at least one row in the column.  
+
+Here you can see we have kept all columns that have some values in them.
+
+```{r, eval=r, eval=TRUE,warning=FALSE}
+
+iris %>% 
+  #added vars to help see what select_if is doing, test2 is removed, test3 is not
+  mutate(na_or_null_t2 = (is.na(test2)|is.null(test2)),
+         na_or_null_t3 = (is.na(test3)|is.null(test3))) %>% 
+  select_if(~sum(!(is.na(.)|is.null(.))) > 0) %>% 
+  slice(1:10) %>% 
+  select(-Sepal.Length) #just to show test3 with NA's
+
+```
+
+
+Here you can see we have kept all columns that are only NA, this can be useful to quickly pick out if some data is missing.  
+```{r, eval=r, eval=TRUE,warning=FALSE}
+
+iris %>% 
+  select_if(~sum(!(is.na(.)|is.null(.))) == 0) %>% 
+  slice(1:10)
+
+```
+
+###*4. fct_recode*
+If you've worked with R for a while, you're like familiar with the data type "Factor".  Factors can be complicated but the forcats (factors rearranged) package has a lot of useful functions to make dealing with factors a lot easier.  One function I find myself using again and again is fct_recode.  This allows you to change the name of the factor level, therefore updating the all occurences of that factor to the new value.  Without changing the level name, you're only changing the value you see in your table, which may cause issues down the line. 
+
+This first example shows how you might want to change a level but it doesn't work as you'd expect. 
+
+```{r, eval=r, eval=TRUE,warning=FALSE}
+
+# You can check a class of a var using "class" - class(iris$Species) - or in the Environment tab
+
+iris2 <- iris %>% 
+  mutate(Species = ifelse((Species=="setosa"),"Tulip",Species))
+
+iris2 %>% 
+  group_by(Species) %>% 
+  summarise(avg = mean(Petal.Length)) %>% 
+  ggplot(aes(x=Species,y=avg,fill=Species)) + 
+  geom_bar(stat="identity")
+
+```
+
+In the next example you can see using fct_recode(col_name,"new_value"="old_value") will properly update the factor levels.  
+
+```{r, eval=r, eval=TRUE,warning=FALSE}
+
+iris3 <- iris %>% 
+  mutate(Species = fct_recode(Species,"Tulip"="setosa"))
+
+iris3 %>% 
+  group_by(Species) %>% 
+  summarise(avg = mean(Petal.Length)) %>% 
+  ggplot(aes(x=Species,y=avg,fill=Species)) + 
+  geom_bar(stat="identity")
+
+```
+
+###*5. rename, replace_na*
+Another set of functions that I often use are "rename" and "replace_na".  Rename allows you to easily rename a column,   and replace_na is a quick way to replace all na values in a list.  Below you can see the syntax for each.
+
+* replace_na(list(col_name=replacement_value,col_name2=replacement_value2,...))
+* rename(new_col_name=old_col_name,new_col_name2=old_col_name2,...)
+```{r, eval=r, eval=TRUE,warning=FALSE}
+
+iris %>% 
+  replace_na(list(test3=0)) %>% 
+  rename(my_new_col=test3) %>% 
+  select(5:10) %>% 
+  slice(1:10)
+
+```
+
+###*6. R Notebooks or Markdown*
+R markdown allows you to easily make your code output something you can share.  As data changes your markdown can redo all calculations and update the output with the up to date values.  You can style your output and easily include calculated values directly in your text. For example, I can directly add the count of rows in a dataset into my text: there are `r length(iris$Species[iris$Species=="setosa"])` setosa species in the iris data set (view the code in the markdown file). You can "knit" your document to html, pdf or word, I prefer the flexibility of html (this document is written in Rmarkdown, knit to html) .   
+
+You can also easily insert formulas into your text and they're formated nicely.
+The likelihood function for logistic regression: $\prod_{i=1}^n p_i^{y_i}(1-p_i)^{1-y_i}$
+
+You can also apply corporate digital styling to your template to share the company look and feel and color pallete. 
+
+
+###*7. Filter with str_detect*
+Many of the functions in the stringr package allow you to use regular expressions to search for string patterns.  The ability to filter using regular expressions can be very powerful.  Below is a simple example.
+
+Here I want to pull out all the rows of data related to film that had a 60 inch width, which is designated '60 IN' in some cases and '60" ' in others.  Using a regular expressiong with str_detect, you can filter to get only the rows you want. Read more about the stringr package and regex [here](https://stringr.tidyverse.org/articles/regular-expressions.html#escaping).
+```{r, eval=r, eval=TRUE,warning=FALSE}
+
+test_data %>% 
+  select(3:5) %>% 
+  slice(1:10)
+
+```
+
+
+```{r, eval=r, eval=TRUE,warning=FALSE}
+
+test_data %>% 
+  filter(str_detect(item_description,"60\"|60 IN")) %>% 
+  select(item_description) %>% 
+  slice(1:10)
+
+```
+
+To take it one step further, you could also create a new variable using regex to pull out the width unit.
+```{r, eval=r, eval=TRUE,warning=FALSE}
+test_data %>% 
+  mutate(measurement = if_else((str_detect(item_description,"[0-9]+\"|[0-9]+ IN")),"Inches",
+                               if_else((str_detect(item_description,"[0-9]+mm|[0-9]+MM")),"MM","Unknown"))) %>% 
+  select(5:6) %>% 
+  slice(1:30)
+```
+
+###*8. Group By & Filter*
+Typically when using a group by function the next step would likely be some sort of summarization. In R you can actually group your data and use summary functions right in the filter.  An example demonstrates the power of this.  Say I have a set of sales related data for each country and I want to only look at the data for those countries with more than 50 sales records for the year. 
+
+```{r, eval=r, eval=TRUE,warning=FALSE}
+
+test_data %>%
+  select(1:4) %>% 
+  slice(1:10) 
+
+```
+
+The first chunk of code is how I would typically think of this problem. 
+```{r, eval=r, eval=TRUE}
+
+test_data %>% 
+  group_by(selling_country,created_year) %>% 
+  mutate(count = n()) %>% 
+  filter(count > 50) %>% 
+  select(1:4) %>% 
+  slice(1:10)
+
+```
+
+This next set of code demonstrates the alternative by using a summarise funtion within the filter. It saves a line of code and there's no need to create an actual count variable. Other summary functions you could use, sum(),n_distinct(),mean(),min(),max(),... and many more.
+```{r, eval=r, eval=TRUE}
+
+test_data %>% 
+  group_by(selling_country,created_year) %>% 
+  filter(n() > 50) %>% 
+  select(1:4) %>% 
+  slice(1:10)
+
+```
+
+
+###*9. Spread & Gather*
+The above commands are a very powerful set of commands for reshaping your data.  Spread and gather will pivot your existing data into a wide and narrow format respetively.
+
+Let's say I want to compare sales year over year by month for any country with over 50 sales. 
+```{r, eval=r, eval=TRUE}
+
+# first summarise the data and get a total for each year and month
+step1 <- test_data2 %>% 
+  group_by(selling_country) %>% 
+  filter(n() > 50) %>% 
+  group_by(selling_country,created_year,created_month) %>%
+  summarise(total_usd = sum(overall_usd_value))
+
+step1 %>% 
+  slice(1:10)
+
+```
+
+```{r, eval=r, eval=TRUE}
+# now use spread to create the table with a row for year year, fill with 0
+step2 <- step1 %>% 
+  group_by(selling_country,created_year) %>% 
+  spread(created_month,total_usd, fill = 0) 
+
+step2 %>% 
+  slice(1:10)
+
+```
+
+```{r, eval=r, eval=TRUE}
+# Use gather to to go back to a narrow format (which also creates a "complete" data set).
+step3 <- step2 %>% 
+  group_by(selling_country,created_year) %>% 
+  gather("month","usd",3:14) %>% 
+  arrange(selling_country,created_year,month)
+
+step3 %>% 
+  slice(1:10)
+
+```
+
+
+###*10. Unite & Seperate*
+You can use unite and separate to collapse or expand serveral columns into one column or one column into many, and it allows you to specify the seperating string. These commands can be quite powerful when paired with some of the commands from above.
+
+In this case "item descripton" actually contains a few things, item description, item dimension, and id numbers.  Let's say we want to pull out the item ID.
+```{r, eval=r, eval=TRUE}
+
+sep_data <- test_data2 %>% 
+  separate(item_description, into = c("item_description", "3MID"), sep = " -3MID- ", drop = TRUE) %>% 
+  separate(`3MID`, into = c("product_code", "sku"), drop = TRUE)
+  
+sep_data %>% 
+  select(5:7) %>% 
+  slice(1:10)
+  
+```
+
+In the next step, I'll use unite to get my unique list of product combinations.
+```{r, eval=r, eval=TRUE, warning=FALSE}
+unite_data <- sep_data %>% 
+  unite("3MID", 6:7, sep = "-", remove = TRUE)
+
+unite_data %>% 
+  select(5:6) %>% 
+  slice(1:10)
+
+```
+
+

@@ -1,0 +1,79 @@
+---
+title: 'Getting Started with R and RStudio'
+author: 'Heather Lendway'
+output:
+  prettydoc::html_pretty:
+    highlight: vignette
+    theme: cayman
+    number_sections: no
+  bookdown::tufte_html2:
+    number_sections: no
+    split_by: none
+    toc: no
+  bookdown::html_document2:
+    number_sections: no
+    split_by: none
+    toc: yes
+    toc_float:
+      collapsed: yes
+  rmarkdown::html_document:
+    highlight: espresso
+    theme: lumen
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+
+```
+
+
+# Download R
+
+* [Download R](https://cran.revolutionanalytics.com/) - Click download R for Windows, onces the download is complete, click the .exe file. Select "Allow"
+to run the install, keep the default prompt values, select next until you can click Finish.
+
+# Download RStudio
+
+* [Download RStudio](https://www.rstudio.com/products/rstudio/download/) - Scroll to the bottom of the page, select the installer that corresponds to your operating system.  Once the download is complete, open the file, click "Allow" to run the install.  You can kep the default values until finished.  You may be requested to select 32 or 64 bit device.
+* Once the install is complete you should be able to open RStudio via the desktop icon or search for it in your programs.
+
+# Tour of RStudio
+
+* Creat a new script, Rmarkdown, RNotebook - File -> New File
+* Import a dataset - File -> Import Dataset
+* Code:
+    + Comment uncomment - Ctrl + Shift + C
+* Tools - Global Options:
+    + General - Uncheck restore your .RData at startup
+    + Appearance - Change your display colors 
+    + Pane - Reorangize your panes
+* Help:
+    + Key board shortcuts
+    + Links to RStudio Community/Cheatsheets
+* Source Pane - where code files will display
+* Environment - shows variables currently loaded
+* History - searchable history of the code you've run, can move it to your script or console
+* Connections - database connections will be shown here
+* Git - if you're using version control this tab will be available
+* Console - where you can run code and see your output. 
+* Files - similar to file explorer on windows
+* Plots - any plots you run in a script on the console will appear here
+* Packages - shows the packages you have installed and the version.  You can update your packages here.
+* Help - allows you to pull up the documentation for a package or a function.  You can also use ?function_name in the console and it will pull up the help documentation for you.
+* You can change your panes in the global options as you please. 
+
+# Installing Packages
+  What's a package? A package contains a group of functions that are related. By default base R functions will be installed but typically you'll need to use supplemental packages to leverage the full capabilities of R.  You can install packages using the package Install dialogue or you can run install.packages("package_name").  Installing the tidyverse should get a good start. You will have to load the packages in your code file as well by using library(package_name). 
+
+# Helpful Links
+* [Cheatsheets](https://www.rstudio.com/resources/cheatsheets/)
+* [RStudio Community](https://community.rstudio.com/)
+* [RStudio Webinars](https://resources.rstudio.com/webinars)
+* [RStudio past conference videos](https://resources.rstudio.com/shiny-developer-conference)
+* [github](www.github.com)
+* [Stack Overflow](www.stackoverflow.com)
+* [Tidyverse](https://www.tidyverse.org/)
+* [google](www.google.com)
+
+
