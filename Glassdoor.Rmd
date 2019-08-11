@@ -33,7 +33,7 @@ Oftentimes the data set you want to work isn't available in a workable format, i
           + If you're just scraping one page it can be quick.
     + Read and parse json
 
-###Glassdoor Search Companies by Location
+### Glassdoor Search Companies by Location
 
 * Browse to https://www.glassdoor.com/index.htm, click on the companies tab. 
 * Open developer tools and go to the network tab. Start typing in a location and see what happens.
@@ -49,37 +49,44 @@ Oftentimes the data set you want to work isn't available in a workable format, i
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-#install.packages("jsonlite")
-#install.packages("tidyjson")
 library(tidyverse)
-#library(tidyjson)
 library(jsonlite)
-library(xml2)
 library(rvest)
 
 ```
 
 
+### Reading JSON For Company Location Id and Type
 
-###Reading JSON
 
 ```{r}
-#Get results links for location company search
-#Need to add a regex for including spaces and possibly special characters
-location <- "Chicago"
-location <- "St. Paul"
+# Get results links for location company search
+location <- "Saint Paul"
 location <- gsub(" ","+",location)
 location_json <- paste0("https://www.glassdoor.com/findPopularLocationAjax.htm?term=",location,"&maxLocationsToReturn=10")
-#Read the JSON for the location link created above
-document <- jsonlite::fromJSON(location_json)
-#df <- data.frame(lapply(document$advisorModels, as.character), stringsAsFactors=FALSE)
 
-##Select the first result, as it's most likely the correct match.  If you're not sure you could loop through and pull results for all possible cities.
-#Build the link to the result page for the location selected
+document <- jsonlite::fromJSON(location_json)
+
 location_companies_url <- paste0("https://www.glassdoor.com/Reviews/company-reviews.htm?suggestCount=0&suggestChosen=false&clickSource=searchBtn&typedKeyword=&sc.keyword=&locT=",document$locationType[1],"&locId=",document$locationId[1],"&jobType=")
 ```
 
-###Reading html
+
+```{r}
+# Get results links for location company search
+location <- "Saint Paul"
+# Replace spaces with + for request URL
+location <- gsub(" ","+",location)
+location_json <- paste0("https://www.glassdoor.com/findPopularLocationAjax.htm?term=",location,"&maxLocationsToReturn=10")
+# Read the JSON for the location link created above
+document <- jsonlite::fromJSON(location_json)
+
+# Build the link to the result page for the location selected
+# Deafult to select the first result, as it's most likely the correct match.  
+# If you're not sure you could loop through and pull results for all possible cities.
+location_companies_url <- paste0("https://www.glassdoor.com/Reviews/company-reviews.htm?suggestCount=0&suggestChosen=false&clickSource=searchBtn&typedKeyword=&sc.keyword=&locT=",document$locationType[1],"&locId=",document$locationId[1],"&jobType=")
+```
+
+### Reading html
 
 ```{r}
 #Read the first result page of companies for that city
@@ -95,10 +102,11 @@ next_page_url <- location_results %>%
 
 next_page_url_string <- paste0("https://www.glassdoor.com",next_page_url)
 
-result_pages <- tibble(next_page_url_string)
+#add the first result page to the list
+result_pages <- tibble(location_companies_url)
 colnames(result_pages) <- c("link")
 
-for(k in 3:10) {
+for(k in 2:10) {
   
   link <- gsub("_IP2",paste0("_IP",k),next_page_url_string)
   
@@ -107,7 +115,8 @@ for(k in 3:10) {
 }
 ```
 
-###Accessing html nodes, attributes and their values
+
+### Accessing html nodes, attributes and their values
 
 * Reference any html node(s) by class name using "." followed by the class name. 
     + rvest::html_nodes(".class_name") - will get all nodes with that class name.  Make sure the name you selected is specific enough to the set of nodes you want.  Many nodes have multiple class names so you may pull back more or less nodes than you want if you're not specific enough/too specific. 
@@ -121,21 +130,29 @@ for(k in 3:10) {
 ![Glassdoor homepage.](companyResults.png)
 
 
-###Run through result links and compile reviews
+```{r}
+company_urls <- location_results %>% 
+  html_nodes(".empLinks") %>% 
+  html_node(".reviews") %>% 
+  html_attr("href")
+  
+#Create a tibble of URLs, add full glassdoor address 
+review_urls_df <- tibble(company_urls) %>% 
+  mutate(full_url = paste0("https://www.glassdoor.com",company_urls,"?sort.sortType=RD&sort.ascending=false&filter.employmentStatus=REGULAR&filter.employmentStatus=PART_TIME&filter.employmentStatus=UNKNOWN"))
+```
+
+### Run through result links and compile reviews
 ```{r, results="hide"}
 #Now we need to get all the company page results links
 #With developer tools mouse over a few review links to see what html node we need
 
 company_reviews <- tibble()
-
-for(h in 0:length(result_pages$link)) {
+#h=0
+for(h in 1:length(result_pages$link)) {
 
   #We already read the first page, once we get past that read subsequent pages.
   #Could clean this up.
-  if(h != 0) {
-    location_results <- read_html(result_pages$link[h]
-                                  )
-  }
+  location_results <- read_html(result_pages$link[h])
   
   #Get the link to each company review page
   company_urls <- location_results %>% 
@@ -164,7 +181,7 @@ for(h in 0:length(result_pages$link)) {
       html_nodes(".hreview")
     
     #for testing
-    #j=1
+    j=4
     for(j in 1:length(hreview_nodes)) {
       
       #Actually want the numerical datetime as it's easier to work with the raw date
@@ -191,44 +208,78 @@ for(h in 0:length(result_pages$link)) {
         toString()
         
       job_location <- hreview_nodes[j] %>% 
-        html_nodes("span.authorLocation.middle") %>% 
+        html_nodes("span.authorLocation") %>% 
         html_text() %>% 
         toString()
       
-      #all the ratings are in spans with the same class so grab them all and assign to variables in order
+      # all the ratings are in spans with the same class so grab them all and assign to variables in order
       ratings <- hreview_nodes[j] %>% 
-        html_nodes("div.tightLt.col.span-1-3") %>% 
-        html_nodes("span.middle") %>% 
+        html_nodes("div.row.reviewBodyCell") %>% 
+        html_nodes("span") %>% 
         html_text()
       
-      recommends_rating <- ratings[1] %>% 
-        toString()
+      # Not all ratings are always filled in so check to see which rating it is and asign to corrsponding var
+      recommends_rating <- NA
+      outlook_rating <- NA
+      ceo_rating <- NA
+      #n=1 #for testing
+      for(n in 1:length(ratings)) {
         
-      outlook_rating <- ratings[2] %>% 
-        toString()
-        
-      ceo_rating <- ratings[3] %>% 
-        toString()
+        if(length(ratings[n]) > 0) {
+          
+          rating_string <- ratings[n] %>% 
+              toString()
+          
+          if(str_detect(rating_string,"Recommend")) {
+            recommends_rating <- rating_string
+          } else if(str_detect(rating_string,"Outlook")) {
+            outlook_rating <- rating_string
+          } else if(str_detect(rating_string,"CEO")) {
+            ceo_rating <- rating_string
+          } 
+        }
+      }
         
       experience <- hreview_nodes[j] %>% 
-        html_nodes("p.tightBot.mainText") %>% 
+        html_nodes("p.mainText") %>% 
         html_text() %>% 
         toString()
         
-      pros <- hreview_nodes[j] %>% 
-        html_nodes("p.pros.mainText.truncateThis.wrapToggleStr") %>% 
-        html_text() %>% 
-        toString()
-        
-      cons <- hreview_nodes[j] %>% 
-        html_nodes("p.cons.mainText.truncateThis.wrapToggleStr") %>% 
-        html_text() %>% 
-        toString()
+      pro_con_advice_nodes <- hreview_nodes[j] %>% 
+        html_nodes("div.mt-md")
       
-      advice_to_management <- hreview_nodes[j] %>% 
-        html_nodes("p.adviceMgmt.mainText.truncateThis.wrapToggleStr") %>% 
-        html_text() %>% 
-        toString()
+      # Not all responses are always filled in so check to see which it is and asign to corrsponding var
+      pros <- NA
+      cons <- NA
+      advice_to_management <- NA
+      #m=1 #for testing
+      for(m in 1:length(pro_con_advice_nodes)) {
+        
+        if(length(pro_con_advice_nodes[m]) > 0) {
+          
+          title_string <- pro_con_advice_nodes[m] %>% 
+            html_nodes("p:nth-child(1)") %>%
+            html_text() %>% 
+            toString()
+          
+          if(str_detect(title_string,"Pros")) {
+            pros <- pro_con_advice_nodes[m] %>% 
+              html_nodes("p:nth-child(2)") %>%
+              html_text() %>% 
+              toString()
+          } else if(str_detect(title_string,"Cons")) {
+            cons <- pro_con_advice_nodes[m] %>% 
+              html_nodes("p:nth-child(2)") %>%
+              html_text() %>% 
+              toString()
+          } else if(str_detect(title_string,"Advice")) {
+            advice_to_management <- pro_con_advice_nodes[m] %>% 
+              html_nodes("p:nth-child(2)") %>%
+              html_text() %>% 
+              toString()
+          } 
+        }
+      }
       
       row <- tibble(company,time,title,job_title,job_location,recommends_rating,outlook_rating,ceo_rating,experience,pros,cons,advice_to_management)
       
@@ -248,7 +299,8 @@ for(h in 0:length(result_pages$link)) {
 
 ```
 
-###Why did I choose a loop instead of nodesets?
+
+### Why did I choose a loop instead of nodesets?
 
 ```{r}
 review_page <- read_html("https://www.glassdoor.com/Reviews/Target-Reviews-E194.htm?sort.sortType=RD&sort.ascending=false&filter.employmentStatus=REGULAR&filter.employmentStatus=PART_TIME&filter.employmentStatus=UNKNOWN")
@@ -270,6 +322,6 @@ pros_test <- hreview_nodes %>%
 ```
 
 
-###Multiple results pages
+### Multiple results pages
 Without logging in you can only access one page of reviews.  If you can log into the site with your request you can get the next set of results with the following URL to start.  
 https://www.glassdoor.com/Reviews/Target-Reviews-E194_P2.htm
