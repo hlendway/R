@@ -147,7 +147,7 @@ review_urls_df <- tibble(company_urls) %>%
 #With developer tools mouse over a few review links to see what html node we need
 
 company_reviews <- tibble()
-#h=0
+#h=0 # for testing
 for(h in 1:length(result_pages$link)) {
 
   #We already read the first page, once we get past that read subsequent pages.
@@ -164,8 +164,7 @@ for(h in 1:length(result_pages$link)) {
   review_urls_df <- tibble(company_urls) %>% 
     mutate(full_url = paste0("https://www.glassdoor.com",company_urls,"?sort.sortType=RD&sort.ascending=false&filter.employmentStatus=REGULAR&filter.employmentStatus=PART_TIME&filter.employmentStatus=UNKNOWN"))
   
-  #for testing using i = 1 and skip for loop
-  #i<- 1
+  #i<- 1 #for testing
   
   #Reading the first ten reviews for each company
   for(i in 1:length(review_urls_df$full_url)) {
@@ -180,8 +179,7 @@ for(h in 1:length(result_pages$link)) {
     hreview_nodes <- review_page %>% 
       html_nodes(".hreview")
     
-    #for testing
-    j=4
+    #j=4 #for testing
     for(j in 1:length(hreview_nodes)) {
       
       #Actually want the numerical datetime as it's easier to work with the raw date
